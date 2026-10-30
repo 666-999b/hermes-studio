@@ -32,6 +32,7 @@ function createTimerModel() {
     now: number,
   ) {
     if (!visible) {
+      if (store.activeSessionId) provisionalThinkingOrigins.delete(store.activeSessionId)
       thinkingStartedAt = 0
       thinkingElapsedMs = 0
       return { origin: 0, elapsed: 0 }
@@ -91,6 +92,24 @@ describe('thinking timer survives a switch into a working session', () => {
     expect(run.origin).toBe(0)
     expect(run.elapsed).toBe(0)
   })
+
+  it('forgets the provisional origin when a run completes so a later unknown-start run starts fresh', () => {
+    const timer = createTimerModel()
+    const store = { activeSessionId: 'a', runStartedAt: new Map<string, number>() }
+
+    // First unknown-start run
+    const first = timer.run(true, store, 1_000)
+    expect(first.origin).toBe(1_000)
+
+    // Run completes without reported start (visible goes false)
+    timer.run(false, store, 2_000)
+    expect(timer.provisionalThinkingOrigins.has('a')).toBe(false)
+
+    // Later, a new unknown-start run in the same session must start fresh, not reuse 1_000
+    const nextRun = timer.run(true, store, 61_000)
+    expect(nextRun.origin).toBe(61_000)
+    expect(nextRun.elapsed).toBe(0)
+  })
 })
 
 describe('the model still matches MessageList.vue', () => {
@@ -109,9 +128,10 @@ describe('the model still matches MessageList.vue', () => {
     expect(body).toContain('provisionalThinkingOrigins.set(sid, thinkingStartedAt)')
   })
 
-  it('still clears the display when the run indicator goes away', () => {
+  it('still clears the display and forgets the provisional origin when the run indicator goes away', () => {
     const body = timerWatchBody()
     expect(body).toContain('if (!visible) {')
+    expect(body).toContain('if (sid) provisionalThinkingOrigins.delete(sid);')
     expect(body).toContain('thinkingStartedAt = 0')
     expect(body).toContain('thinkingElapsedMs.value = 0')
   })

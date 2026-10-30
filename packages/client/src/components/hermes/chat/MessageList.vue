@@ -721,6 +721,8 @@ watch(
   ([visible]) => {
     stopThinkingTimer();
     if (!visible) {
+      const sid = chatStore.activeSessionId;
+      if (sid) provisionalThinkingOrigins.delete(sid);
       thinkingStartedAt = 0;
       thinkingElapsedMs.value = 0;
       return;
